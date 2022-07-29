@@ -1,26 +1,26 @@
 // Context Module Functions
 // http://localhost:3000/isolated/exercise/01.js
 
-import * as React from 'react'
-import {dequal} from 'dequal'
+import * as React from 'react';
+import { dequal } from 'dequal';
 
 // ./context/user-context.js
 
-import * as userClient from '../user-client'
-import {useAuth} from '../auth-context'
+import * as userClient from '../user-client';
+import { useAuth } from '../auth-context';
 
-const UserContext = React.createContext()
-UserContext.displayName = 'UserContext'
+const UserContext = React.createContext();
+UserContext.displayName = 'UserContext';
 
 function userReducer(state, action) {
   switch (action.type) {
     case 'start update': {
       return {
         ...state,
-        user: {...state.user, ...action.updates},
+        user: { ...state.user, ...action.updates },
         status: 'pending',
         storedUser: state.user,
-      }
+      };
     }
     case 'finish update': {
       return {
@@ -29,7 +29,7 @@ function userReducer(state, action) {
         status: 'resolved',
         storedUser: null,
         error: null,
-      }
+      };
     }
     case 'fail update': {
       return {
@@ -38,71 +38,84 @@ function userReducer(state, action) {
         error: action.error,
         user: state.storedUser,
         storedUser: null,
-      }
+      };
     }
     case 'reset': {
       return {
         ...state,
         status: null,
         error: null,
-      }
+      };
     }
     default: {
-      throw new Error(`Unhandled action type: ${action.type}`)
+      throw new Error(`Unhandled action type: ${action.type}`);
     }
   }
 }
 
-function UserProvider({children}) {
-  const {user} = useAuth()
-  const [state, dispatch] = React.useReducer(userReducer, {
+function UserProvider({ children }) {
+  const { user } = useAuth();
+  const [ state, dispatch ] = React.useReducer(userReducer, {
     status: null,
     error: null,
     storedUser: user,
     user,
-  })
-  const value = [state, dispatch]
-  return <UserContext.Provider value={value}>{children}</UserContext.Provider>
+  });
+  const value = [state, dispatch];
+
+  return <UserContext.Provider value={value}>{children}</UserContext.Provider>;
 }
 
 function useUser() {
-  const context = React.useContext(UserContext)
+  const context = React.useContext(UserContext);
+
   if (context === undefined) {
-    throw new Error(`useUser must be used within a UserProvider`)
+    throw new Error("useUser must be used within a UserProvider");
   }
-  return context
+
+  return context;
 }
 
-// 🐨 add a function here called `updateUser`
-// Then go down to the `handleSubmit` from `UserSettings` and put that logic in
-// this function. It should accept: dispatch, user, and updates
+// got this idea from Dan and I love it:
+// https://twitter.com/dan_abramov/status/1125773153584676864
+async function updateUser(dispatch, user, updates) {
+  dispatch({type: 'start update', updates});
 
-// export {UserProvider, useUser}
+  try {
+    const updatedUser = await userClient.updateUser(user, updates);
+    dispatch({type: 'finish update', updatedUser});
+
+    return updatedUser;
+  } catch (error) {
+    dispatch({type: 'fail update', error});
+
+    return Promise.reject(error);
+  }
+}
+
+// export {UserProvider, useUser, updateUser}
 
 // src/screens/user-profile.js
-// import {UserProvider, useUser} from './context/user-context'
+// import {UserProvider, useUser, updateUser} from './context/user-context'
 function UserSettings() {
-  const [{user, status, error}, userDispatch] = useUser()
+  const [{user, status, error}, userDispatch] = useUser();
 
-  const isPending = status === 'pending'
-  const isRejected = status === 'rejected'
+  const isPending = status === 'pending';
+  const isRejected = status === 'rejected';
 
-  const [formState, setFormState] = React.useState(user)
+  const [formState, setFormState] = React.useState(user);
 
-  const isChanged = !dequal(user, formState)
+  const isChanged = !dequal(user, formState);
 
   function handleChange(e) {
-    setFormState({...formState, [e.target.name]: e.target.value})
+    setFormState({...formState, [e.target.name]: e.target.value});
   }
 
   function handleSubmit(event) {
-    event.preventDefault()
-    // 🐨 move the following logic to the `updateUser` function you create above
-    userDispatch({type: 'start update', updates: formState})
-    userClient.updateUser(user, formState).then(
-      updatedUser => userDispatch({type: 'finish update', updatedUser}),
-      error => userDispatch({type: 'fail update', error}),
-    )
+    event.preventDefault();
+    updateUser(userDispatch, user, formState).catch(() => {
+      /* ignore the error */
+    });
   }
 
   return (
@@ -148,8 +161,8 @@ function UserSettings() {
         <button
           type="button"
           onClick={() => {
-            setFormState(user)
-            userDispatch({type: 'reset'})
+            setFormState(user);
+            userDispatch({type: 'reset'});
           }}
           disabled={!isChanged || isPending}
         >
@@ -174,7 +187,7 @@ function UserSettings() {
 }
 
 function UserDataDisplay() {
-  const [{user}] = useUser()
+  const [{ user }] = useUser();
   return <pre>{JSON.stringify(user, null, 2)}</pre>
 }
 
@@ -197,4 +210,4 @@ function App() {
   )
 }
 
-export default App
+export default App;
